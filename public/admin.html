@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Administración - Apapacho Reader</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --color-primary: #0a7ea4;
+            --color-gold: #C5A059;
+            --color-blue: #8C97AE;
+            --color-red: #9E4747;
+            --color-background: #ffffff;
+            --color-surface: #f5f5f5;
+            --color-foreground: #11181C;
+            --color-muted: #687076;
+        }
+        
+        body {
+            font-family: 'Lato', sans-serif;
+            background-color: var(--color-background);
+            color: var(--color-foreground);
+        }
+        
+        .serif {
+            font-family: 'Playfair Display', serif;
+        }
+        
+        .btn-primary {
+            background-color: var(--color-gold);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: #b39147;
+        }
+        
+        .tab-active {
+            border-bottom: 3px solid var(--color-gold);
+            color: var(--color-gold);
+        }
+        
+        .status-published {
+            background-color: #dcfce7;
+            color: #166534;
+        }
+        
+        .status-draft {
+            background-color: #fef3c7;
+            color: #92400e;
+        }
+    </style>
+</head>
+<body>
+    <div class="min-h-screen bg-gray-50">
+        <!-- Header -->
+        <header class="bg-white border-b border-gray-200">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h1 class="serif text-3xl font-bold text-foreground">Panel de Administración</h1>
+                        <p class="text-sm text-muted">Editorial Apapacho</p>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <span class="text-sm text-muted" id="user-info">Cargando...</span>
+                        <button onclick="logout()" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">
+                            Salir
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation Tabs -->
+        <div class="bg-white border-b border-gray-200">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <nav class="flex gap-8" role="tablist">
+                    <button onclick="switchTab('books')" class="tab-btn tab-active py-4 px-1 border-b-4 border-gold font-semibold text-gold" role="tab">
+                        📚 Libros
+                    </button>
+                    <button onclick="switchTab('chapters')" class="tab-btn py-4 px-1 border-b-4 border-transparent font-semibold text-muted hover:text-foreground" role="tab">
+                        📖 Capítulos
+                    </button>
+                    <button onclick="switchTab('webinars')" class="tab-btn py-4 px-1 border-b-4 border-transparent font-semibold text-muted hover:text-foreground" role="tab">
+                        🎥 Webinars
+                    </button>
+                    <button onclick="switchTab('stats')" class="tab-btn py-4 px-1 border-b-4 border-transparent font-semibold text-muted hover:text-foreground" role="tab">
+                        📊 Estadísticas
+                    </button>
+                </nav>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <!-- Books Tab -->
+            <div id="books-tab" class="tab-content">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <!-- Create Book Form -->
+                    <div class="lg:col-span-1">
+                        <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+                            <h2 class="text-lg font-semibold mb-4">Crear Nuevo Libro</h2>
+                            <form id="book-form" onsubmit="handleCreateBook(event)" class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-foreground mb-1">Título *</label>
+                                    <input type="text" name="title" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-foreground mb-1">Autor *</label>
+                                    <input type="text" name="author" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-foreground mb-1">Slug *</label>
+                                    <input type="text" name="slug" placeholder="ej: mi-libro" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-foreground mb-1">Descripción</label>
+                                    <textarea name="description" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold"></textarea>
+                                </div>
+                                <button type="submit" class="w-full btn-primary py-2 rounded-lg font-semibold">
+                                    Crear Libro
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Books List -->
+                    <div class="lg:col-span-2">
+                        <h2 class="text-lg font-semibold mb-4">Libros Publicados</h2>
+                        <div id="books-list" class="space-y-3">
+                            <p class="text-muted">Cargando...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chapters Tab -->
+            <div id="chapters-tab" class="tab-content hidden">
+                <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+                    <p class="text-muted">Selecciona un libro para gestionar sus capítulos</p>
+                </div>
+            </div>
+
+            <!-- Webinars Tab -->
+            <div id="webinars-tab" class="tab-content hidden">
+                <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+                    <button class="btn-primary px-6 py-2 rounded-lg font-semibold">
+                        + Nuevo Webinar
+                    </button>
+                </div>
+            </div>
+
+            <!-- Stats Tab -->
+            <div id="stats-tab" class="tab-content hidden">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+                        <p class="text-3xl font-bold text-gold" id="stat-total">0</p>
+                        <p class="text-sm text-muted">Libros Totales</p>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+                        <p class="text-3xl font-bold text-green-600" id="stat-published">0</p>
+                        <p class="text-sm text-muted">Publicados</p>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+                        <p class="text-3xl font-bold text-yellow-600" id="stat-draft">0</p>
+                        <p class="text-sm text-muted">Borradores</p>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+                        <p class="text-3xl font-bold text-blue" id="stat-users">0</p>
+                        <p class="text-sm text-muted">Usuarios</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const API_URL = window.location.origin;
+        let currentTab = 'books';
+
+        // Check authentication
+        async function checkAuth() {
+            try {
+                const response = await fetch(`${API_URL}/api/trpc/auth.me`);
+                const data = await response.json();
+                
+                if (data.result?.data && data.result.data.role === 'admin') {
+                    document.getElementById('user-info').textContent = `Bienvenido, ${data.result.data.name || 'Admin'}`;
+                    loadBooks();
+                } else {
+                    window.location.href = '/';
+                }
+            } catch (error) {
+                console.error('Auth error:', error);
+                window.location.href = '/';
+            }
+        }
+
+        async function loadBooks() {
+            try {
+                const response = await fetch(`${API_URL}/api/trpc/books.list`);
+                const data = await response.json();
+                
+                const books = data.result?.data || [];
+                const booksList = document.getElementById('books-list');
+                
+                if (books.length === 0) {
+                    booksList.innerHTML = '<p class="text-muted">No hay libros aún</p>';
+                    return;
+                }
+
+                booksList.innerHTML = books.map(book => `
+                    <div class="bg-white rounded-lg shadow p-4 border border-gray-200">
+                        <div class="flex justify-between items-start mb-3">
+                            <div>
+                                <h3 class="font-semibold text-foreground">${book.title}</h3>
+                                <p class="text-sm text-muted">${book.author}</p>
+                            </div>
+                            <span class="px-3 py-1 rounded text-xs font-semibold ${book.published ? 'status-published' : 'status-draft'}">
+                                ${book.published ? '✓ Publicado' : '⊘ Borrador'}
+                            </span>
+                        </div>
+                        <div class="flex gap-2">
+                            <button class="flex-1 px-3 py-2 bg-blue/10 text-blue rounded text-sm font-semibold hover:bg-blue/20">
+                                Editar
+                            </button>
+                            <button class="flex-1 px-3 py-2 bg-red-100 text-red-600 rounded text-sm font-semibold hover:bg-red-200">
+                                Eliminar
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+
+                // Update stats
+                document.getElementById('stat-total').textContent = books.length;
+                document.getElementById('stat-published').textContent = books.filter(b => b.published).length;
+                document.getElementById('stat-draft').textContent = books.filter(b => !b.published).length;
+            } catch (error) {
+                console.error('Error loading books:', error);
+            }
+        }
+
+        async function handleCreateBook(event) {
+            event.preventDefault();
+            const formData = new FormData(event.target);
+            
+            try {
+                const response = await fetch(`${API_URL}/api/trpc/books.create`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title: formData.get('title'),
+                        author: formData.get('author'),
+                        slug: formData.get('slug'),
+                        description: formData.get('description'),
+                    }),
+                });
+
+                if (response.ok) {
+                    alert('Libro creado correctamente');
+                    event.target.reset();
+                    loadBooks();
+                } else {
+                    alert('Error al crear el libro');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error al crear el libro');
+            }
+        }
+
+        function switchTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`${tab}-tab`).classList.remove('hidden');
+            
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('tab-active');
+                btn.classList.add('border-transparent', 'text-muted');
+            });
+            event.target.classList.add('tab-active');
+            event.target.classList.remove('border-transparent', 'text-muted');
+            event.target.classList.add('border-gold', 'text-gold');
+        }
+
+        function logout() {
+            if (confirm('¿Deseas cerrar sesión?')) {
+                fetch(`${API_URL}/api/trpc/auth.logout`, { method: 'POST' })
+                    .then(() => window.location.href = '/');
+            }
+        }
+
+        // Initialize
+        checkAuth();
+    </script>
+</body>
+</html>
