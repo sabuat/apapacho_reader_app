@@ -1,159 +1,133 @@
-import { useState } from "react";
-import { ScrollView, Text, View, TouchableOpacity, TextInput, Alert } from "react-native";
+import { ScrollView, Text, View, TouchableOpacity, FlatList, ActivityIndicator } from "react-native";
+import { Image } from "expo-image";
 import { useRouter } from "expo-router";
+import { useEffect, useState } from "react";
 
 import { ScreenContainer } from "@/components/screen-container";
+import { supabase } from "@/lib/supabase";
 
-import { supabase } from '@/lib/supabase'; 
+interface Book {
+  id: number;
+  title: string;
+  author: string;
+  slug: string;
+  description?: string;
+  published: boolean;
+  cover_url?: string;
+}
 
-export default function AuthScreen() {
+export default function HomeScreen() {
   const router = useRouter();
-  const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [books, setBooks] = useState<Book[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleAuth = async () => {
-    if (!email || !password) {
-      Alert.alert("Error", "Por favor completa todos los campos");
-      return;
-    }
+  useEffect(() => {
+    fetchBooks();
+  }, []);
 
-    setLoading(true);
+  const fetchBooks = async () => {
     try {
-      if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        router.replace("/(tabs)");
-      } else {
-        if (!name) return Alert.alert("Error", "Ingresa tu nombre");
-        const { error } = await supabase.auth.signUp({ 
-          email, 
-          password,
-          options: { data: { full_name: name } }
-        });
-        if (error) throw error;
-        Alert.alert("Éxito", "Revisa tu correo para confirmar tu cuenta");
-      }
+      const { data, error } = await supabase
+        .from('books')
+        .select('*')
+        .eq('published', true)
+        .order('id', { ascending: false });
+        
+      if (error) throw error;
+      if (data) setBooks(data);
     } catch (error) {
-      Alert.alert("Error", error.message);
+      console.error("Error cargando libros:", error.message);
     } finally {
       setLoading(false);
     }
   };
 
+  const handleBookPress = (bookId: number) => {
+    router.push(`/reader/${bookId}`);
+  };
+
   return (
     <ScreenContainer className="bg-background">
       <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
-        <View className="flex-1 justify-center px-6 gap-6 py-8">
-          {/* Logo/Header */}
-          <View className="items-center gap-2 mb-4">
-            <Text className="text-4xl font-bold font-serif text-primary">Apapacho</Text>
+        <View className="gap-6 pb-6">
+          <View className="px-6 pt-4 gap-2">
+            <Text className="text-3xl font-bold font-serif text-foreground">Apapacho</Text>
             <Text className="text-sm text-muted">Literatura que te abraza</Text>
           </View>
 
-          {/* Title */}
-          <View className="gap-1">
-            <Text className="text-2xl font-bold font-serif text-foreground">
-              {isLogin ? "Inicia sesión" : "Crea tu cuenta"}
-            </Text>
-            <Text className="text-sm text-muted">
-              {isLogin
-                ? "Accede a tu biblioteca personal"
-                : "Únete a nuestra comunidad de lectores"}
-            </Text>
-          </View>
+          {!loading && books.length > 0 && (
+            <View className="px-6 gap-3">
+              <Text className="text-lg font-semibold font-serif text-foreground">Destacado</Text>
+              <TouchableOpacity
+                onPress={() => handleBookPress(books[0].id)}
+                className="bg-surface rounded-2xl p-4 border border-border active:opacity-80"
+              >
+                <View className="flex-row gap-4">
+                  <Image
+                    source={books[0].cover_url ? { uri: books[0].cover_url } : require("@/assets/images/icon.png")}
+                    style={{ width: 80, height: 120 }}
+                    contentFit="cover"
+                    className="rounded border border-border"
+                  />
+                  <View className="flex-1 justify-center">
+                    <View className="gap-1 mb-4">
+                      <Text className="text-lg font-semibold text-foreground">{books[0].title}</Text>
+                      <Text className="text-sm text-muted">{books[0].author}</Text>
+                    </View>
+                    <View className="bg-primary rounded px-3 py-2 self-start">
+                      <Text className="text-white text-xs font-semibold">Comenzar a leer</Text>
+                    </View>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            </View>
+          )}
 
-          {/* Form */}
-          <View className="gap-4">
-            {!isLogin && (
-              <View className="gap-2">
-                <Text className="text-sm font-semibold text-foreground">Nombre</Text>
-                <TextInput
-                  placeholder="Tu nombre completo"
-                  value={name}
-                  onChangeText={setName}
-                  placeholderTextColor="#687076"
-                  className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
-                />
+          <View className="px-6 gap-3">
+            <View className="flex-row justify-between items-center">
+              <Text className="text-lg font-semibold font-serif text-foreground">Biblioteca</Text>
+            </View>
+
+            {loading ? (
+              <View className="items-center justify-center py-8">
+                <ActivityIndicator size="large" color="#C5A059" />
               </View>
+            ) : books.length === 0 ? (
+              <View className="bg-surface rounded-lg p-6 items-center justify-center border border-border">
+                <Text className="text-sm text-muted text-center">
+                  No hay libros disponibles en este momento
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                data={books}
+                keyExtractor={(item) => item.id.toString()}
+                scrollEnabled={false}
+                numColumns={2}
+                columnWrapperStyle={{ gap: 12 }}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    onPress={() => handleBookPress(item.id)}
+                    className="flex-1 bg-surface rounded-lg overflow-hidden border border-border active:opacity-80 mb-4"
+                  >
+                    <Image
+                      source={item.cover_url ? { uri: item.cover_url } : require("@/assets/images/icon.png")}
+                      style={{ width: "100%", height: 180 }}
+                      contentFit="cover"
+                    />
+                    <View className="p-3 gap-1">
+                      <Text className="text-sm font-semibold text-foreground" numberOfLines={2}>
+                        {item.title}
+                      </Text>
+                      <Text className="text-xs text-muted" numberOfLines={1}>
+                        {item.author}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                )}
+              />
             )}
-
-            <View className="gap-2">
-              <Text className="text-sm font-semibold text-foreground">Email</Text>
-              <TextInput
-                placeholder="tu@email.com"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                placeholderTextColor="#687076"
-                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
-              />
-            </View>
-
-            <View className="gap-2">
-              <Text className="text-sm font-semibold text-foreground">Contraseña</Text>
-              <TextInput
-                placeholder="••••••••"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                placeholderTextColor="#687076"
-                className="bg-surface border border-border rounded-lg px-4 py-3 text-foreground"
-              />
-            </View>
           </View>
-
-          {/* Auth Button */}
-          <TouchableOpacity
-            onPress={handleAuth}
-            disabled={loading}
-            className="bg-primary rounded-lg py-3 disabled:opacity-50"
-          >
-            <Text className="text-white font-semibold text-center">
-              {loading ? "Procesando..." : isLogin ? "Iniciar sesión" : "Crear cuenta"}
-            </Text>
-          </TouchableOpacity>
-
-          {/* Toggle Auth Mode */}
-          <View className="flex-row justify-center gap-1">
-            <Text className="text-sm text-muted">
-              {isLogin ? "¿No tienes cuenta?" : "¿Ya tienes cuenta?"}
-            </Text>
-            <TouchableOpacity onPress={() => setIsLogin(!isLogin)}>
-              <Text className="text-sm text-primary font-semibold">
-                {isLogin ? "Regístrate" : "Inicia sesión"}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Divider */}
-          <View className="flex-row items-center gap-3">
-            <View className="flex-1 h-px bg-border" />
-            <Text className="text-xs text-muted">O continúa con</Text>
-            <View className="flex-1 h-px bg-border" />
-          </View>
-
-          {/* Social Auth Buttons */}
-          <View className="gap-2">
-            <TouchableOpacity className="bg-surface border border-border rounded-lg py-3 flex-row items-center justify-center gap-2">
-              <Text className="text-lg">🔵</Text>
-              <Text className="text-sm font-semibold text-foreground">Google</Text>
-            </TouchableOpacity>
-            <TouchableOpacity className="bg-surface border border-border rounded-lg py-3 flex-row items-center justify-center gap-2">
-              <Text className="text-lg">🍎</Text>
-              <Text className="text-sm font-semibold text-foreground">Apple</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Terms */}
-          <Text className="text-xs text-muted text-center">
-            Al continuar, aceptas nuestros{" "}
-            <Text className="text-primary font-semibold">Términos de Servicio</Text> y{" "}
-            <Text className="text-primary font-semibold">Política de Privacidad</Text>
-          </Text>
         </View>
       </ScrollView>
     </ScreenContainer>
