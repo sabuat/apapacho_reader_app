@@ -4,6 +4,8 @@ import { useRouter } from "expo-router";
 
 import { ScreenContainer } from "@/components/screen-container";
 
+import { supabase } from '@/lib/supabase'; 
+
 export default function AuthScreen() {
   const router = useRouter();
   const [isLogin, setIsLogin] = useState(true);
@@ -18,20 +20,24 @@ export default function AuthScreen() {
       return;
     }
 
-    if (!isLogin && !name) {
-      Alert.alert("Error", "Por favor ingresa tu nombre");
-      return;
-    }
-
     setLoading(true);
     try {
-      // Mock authentication - in production, this would call an API
-      setTimeout(() => {
-        Alert.alert("Éxito", isLogin ? "Sesión iniciada" : "Cuenta creada");
+      if (isLogin) {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
         router.replace("/(tabs)");
-      }, 1000);
+      } else {
+        if (!name) return Alert.alert("Error", "Ingresa tu nombre");
+        const { error } = await supabase.auth.signUp({ 
+          email, 
+          password,
+          options: { data: { full_name: name } }
+        });
+        if (error) throw error;
+        Alert.alert("Éxito", "Revisa tu correo para confirmar tu cuenta");
+      }
     } catch (error) {
-      Alert.alert("Error", "Algo salió mal");
+      Alert.alert("Error", error.message);
     } finally {
       setLoading(false);
     }

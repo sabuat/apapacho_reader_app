@@ -1,171 +1,238 @@
 import { useState, useEffect } from "react";
-import { ScrollView, Text, View, TouchableOpacity, Alert } from "react-native";
+import { ScrollView, Text, View, TouchableOpacity, ActivityIndicator } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 
 import { ScreenContainer } from "@/components/screen-container";
-import { getBookById, getChapterByNumber } from "@/lib/books-data";
+import { supabase } from "@/lib/supabase"; // Conexión a tu base de datos
 
 export default function ReaderScreen() {
   const router = useRouter();
   const { id, chapter: chapterParam } = useLocalSearchParams();
+  
   const [fontSize, setFontSize] = useState(16);
   const [currentChapter, setCurrentChapter] = useState(parseInt(chapterParam as string) || 1);
   const [showAd, setShowAd] = useState(false);
+  
+  // Nuevos estados para manejar los datos reales de Supabase
+  const [book, setBook] = useState(null);
+  const [chapter, setChapter] = useState(null);
+  const [totalChapters, setTotalChapters] = useState(0);
+  const [loading, setLoading] = useState(true);
 
-  const book = getBookById(id as string);
-  const chapter = book ? getChapterByNumber(book, currentChapter) : null;
+  // 1. Cargar los detalles del libro y el total de capítulos
+  useEffect(() => {
+    if (!id) return;
+    
+    const fetchBookInfo = async () => {
+      try {
+        const { data: bookData, error: bookError } = await supabase
+          .from('books')
+          .select('*')
+          .eq('id', id)
+          .single();
+          
+        if (bookError) throw bookError;
+        setBook(bookData);
 
-  if (!book || !chapter) {
-    return (
-      <ScreenContainer className="items-center justify-center">
-        <Text className="text-foreground">Libro no encontrado</Text>
-      </ScreenContainer>
-    );
-  }
-
-  const handleNextChapter = () => {
-    if (currentChapter < book.chapters.length) {
-      // Show ad every 3 chapters
-      if (currentChapter % 3 === 0) {
-        setShowAd(true);
-        setTimeout(() => {
-          setShowAd(false);
-          setCurrentChapter(currentChapter + 1);
-        }, 3000);
-      } else {
-        setCurrentChapter(currentChapter + 1);
+        // Contar el total de capítulos para la barra de progreso
+        const { count, error: countError } = await supabase
+          .from('chapters')
+          .select('*', { count: 'exact', head: true })
+          .eq('book_id', id);
+          
+        if (countError) throw countError;
+        setTotalChapters(count || 0);
+        
+      } catch (error) {
+        console.error("Error cargando libro:", error.message);
       }
+    };
+
+    fetchBookInfo();
+  }, [id]);
+
+  // 2. Cargar el texto del capítulo actual
+  useEffect(() => {
+    if (!id) return;
+
+    const fetchChapterContent = async () => {
+      setLoading(true);
+      try {
+        const { data: chapterData, error } = await supabase
+          .from('chapters')
+          .select('*')
+          .eq('book_id', id)
+          .eq('chapter_number', currentChapter)
+          .single();
+
+        if (error) throw error;
+        setChapter(chapterData);
+      } catch (error) {
+        console.error("Error cargando capítulo:", error.message);
+        setChapter(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchChapterContent();
+  }, [id, currentChapter]);
+
+  // Manejo de cambio de capítulo con PUBLICIDAD
+  const handleNextChapter = () => {
+    if (currentChapter < totalChapters) {
+      // Mostramos la publicidad SIEMPRE al avanzar, según tu modelo de negocio
+      setShowAd(true);
+      setTimeout(() => {
+        setShowAd(false);
+        setCurrentChapter(prev => prev + 1);
+      }, 3000); // El anuncio dura 3 segundos antes de cargar el texto
     }
   };
 
   const handlePreviousChapter = () => {
     if (currentChapter > 1) {
-      setCurrentChapter(currentChapter - 1);
+      setCurrentChapter(prev => prev - 1);
     }
   };
 
-  const progress = (currentChapter / book.chapters.length) * 100;
+  // Pantalla de carga mientras trae los datos de la nube
+  if (loading && !chapter) {
+    return (
+      <ScreenContainer className="items-center justify-center bg-background">
+        <ActivityIndicator size="large" color="#C5A059" />
+        <Text className="text-foreground mt-4">Abriendo libro...</Text>
+      </ScreenContainer>
+    );
+  }
+
+  // Prevención de errores si el libro o capítulo no existe
+  if (!book || !chapter) {
+    return (
+      <ScreenContainer className="items-center justify-center bg-background">
+        <Text className="text-foreground">Este capítulo aún no está disponible.</Text>
+        <TouchableOpacity onPress={() => router.back()} className="mt-4 px-4 py-2 bg-primary rounded-lg">
+          <Text className="text-white font-semibold">Volver a la biblioteca</Text>
+        </TouchableOpacity>
+      </ScreenContainer>
+    );
+  }
+
+  // Cálculo real del progreso del lector
+  const progress = totalChapters > 0 ? (currentChapter / totalChapters) * 100 : 0;
 
   return (
     <ScreenContainer className="bg-background">
       {/* Header */}
       <View className="px-4 py-3 border-b border-border flex-row justify-between items-center">
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text className="text-primary text-lg">←</Text>
+        <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2">
+          <Text className="text-primary text-2xl leading-none">←</Text>
         </TouchableOpacity>
         <View className="flex-1 mx-4">
           <Text className="text-sm font-semibold text-foreground text-center" numberOfLines={1}>
             {book.title}
           </Text>
           <Text className="text-xs text-muted text-center">
-            Capítulo {currentChapter} de {book.chapters.length}
+            Capítulo {currentChapter} de {totalChapters}
           </Text>
         </View>
-        <TouchableOpacity>
-          <Text className="text-primary text-lg">⋮</Text>
+        <TouchableOpacity className="p-2 -mr-2">
+          <Text className="text-primary text-2xl leading-none">⋮</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Ad Banner */}
+      {/* Pantalla de Publicidad Intersticial (Pausa de 3 segundos) */}
       {showAd && (
-        <View className="bg-secondary/10 border-b border-secondary px-4 py-3">
-          <Text className="text-xs text-muted text-center">
-            Publicidad: Continúa leyendo en 3 segundos...
-          </Text>
+        <View className="absolute z-50 inset-0 bg-background items-center justify-center px-6">
+           <Text className="text-sm font-bold text-primary mb-4 tracking-widest">PUBLICIDAD</Text>
+           <View className="w-full h-64 bg-surface rounded-xl border border-border items-center justify-center mb-8 shadow-sm">
+             <Text className="text-muted text-center px-4">Espacio reservado para tu red de anuncios (AdMob / Meta)</Text>
+           </View>
+           <ActivityIndicator size="small" color="#C5A059" className="mb-4" />
+           <Text className="text-sm text-foreground text-center font-semibold">
+             Tu capítulo cargará en breve...
+           </Text>
         </View>
       )}
 
-      {/* Content */}
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
-        <View className="px-6 py-6 gap-4">
-          {/* Chapter Title */}
-          <View className="gap-2 mb-4">
-            <Text className="text-2xl font-bold font-serif text-foreground">
+      {/* Contenido del Libro */}
+      <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
+        <View className="px-6 py-8 gap-6">
+          <View className="gap-2 mb-2">
+            <Text className="text-xs text-primary font-bold uppercase tracking-wider">Capítulo {chapter.chapter_number}</Text>
+            <Text className="text-3xl font-bold font-serif text-foreground leading-tight">
               {chapter.title}
             </Text>
-            <Text className="text-sm text-muted">Capítulo {chapter.number}</Text>
           </View>
 
-          {/* Chapter Content */}
           <Text
-            style={{ fontSize }}
-            className="text-foreground leading-relaxed"
+            style={{ fontSize, lineHeight: fontSize * 1.6 }}
+            className="text-foreground text-justify"
           >
             {chapter.content}
           </Text>
 
-          {/* Ad Banner at End of Chapter */}
-          {currentChapter % 3 === 0 && (
-            <View className="bg-primary/10 rounded-lg p-4 mt-6 border border-primary/20">
-              <Text className="text-xs font-semibold text-primary mb-2">PUBLICIDAD</Text>
-              <Text className="text-sm text-foreground">
-                Descubre más libros en Editorial Apapacho
+          {/* Banner de publicidad estático al final del capítulo */}
+          <View className="bg-surface rounded-xl p-5 mt-8 border border-border items-center shadow-sm">
+            <Text className="text-[10px] font-bold text-muted uppercase tracking-wider mb-3">Patrocinado</Text>
+            <Text className="text-base font-serif text-foreground text-center mb-4">
+              ¿Te está gustando la lectura? Apoya a Apapacho compartiendo la app.
+            </Text>
+            <TouchableOpacity className="bg-primary rounded-lg px-6 py-2.5 w-full">
+              <Text className="text-white text-sm font-semibold text-center">
+                Descubrir más libros
               </Text>
-              <TouchableOpacity className="mt-3 bg-primary rounded px-3 py-2">
-                <Text className="text-white text-xs font-semibold text-center">
-                  Explorar biblioteca
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
 
-      {/* Footer Controls */}
-      <View className="border-t border-border px-4 py-4 gap-3">
-        {/* Progress Bar */}
-        <View className="gap-1">
-          <View className="h-1 bg-border rounded-full overflow-hidden">
+      {/* Controles de Pie de Página */}
+      <View className="border-t border-border px-5 py-5 gap-4 bg-background">
+        {/* Barra de Progreso */}
+        <View className="gap-2">
+          <View className="h-1.5 bg-surface rounded-full overflow-hidden border border-border/50">
             <View
-              className="h-full bg-primary"
+              className="h-full bg-primary rounded-full"
               style={{ width: `${progress}%` }}
             />
           </View>
-          <Text className="text-xs text-muted text-center">
+          <Text className="text-[10px] text-muted text-center font-semibold uppercase tracking-wider">
             {Math.round(progress)}% completado
           </Text>
         </View>
 
-        {/* Font Size Controls */}
-        <View className="flex-row justify-center gap-4 mb-2">
-          <TouchableOpacity
-            onPress={() => setFontSize(Math.max(12, fontSize - 2))}
-            className="px-3 py-2 bg-surface rounded border border-border"
-          >
-            <Text className="text-sm text-foreground">A-</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setFontSize(16)}
-            className="px-3 py-2 bg-surface rounded border border-border"
-          >
-            <Text className="text-sm text-foreground">Reset</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setFontSize(Math.min(24, fontSize + 2))}
-            className="px-3 py-2 bg-surface rounded border border-border"
-          >
-            <Text className="text-sm text-foreground">A+</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Navigation */}
-        <View className="flex-row gap-3">
+        <View className="flex-row justify-between items-center mt-2">
+          {/* Botón Anterior */}
           <TouchableOpacity
             onPress={handlePreviousChapter}
             disabled={currentChapter === 1}
-            className="flex-1 bg-surface rounded-lg py-3 border border-border disabled:opacity-50"
+            className={`flex-1 py-3 border border-border rounded-lg mr-2 ${currentChapter === 1 ? 'opacity-40 bg-surface' : 'bg-background hover:bg-surface'}`}
           >
             <Text className="text-sm font-semibold text-foreground text-center">
-              ← Anterior
+              Anterior
             </Text>
           </TouchableOpacity>
+
+          {/* Controles de Tamaño de Letra */}
+          <View className="flex-row bg-surface rounded-lg p-1 mx-2 border border-border">
+            <TouchableOpacity onPress={() => setFontSize(Math.max(14, fontSize - 2))} className="px-4 py-2">
+              <Text className="text-foreground font-semibold text-sm">A-</Text>
+            </TouchableOpacity>
+            <View className="w-px bg-border my-2" />
+            <TouchableOpacity onPress={() => setFontSize(Math.min(28, fontSize + 2))} className="px-4 py-2">
+              <Text className="text-foreground font-semibold text-base">A+</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Botón Siguiente */}
           <TouchableOpacity
             onPress={handleNextChapter}
-            disabled={currentChapter === book.chapters.length}
-            className="flex-1 bg-primary rounded-lg py-3 disabled:opacity-50"
+            disabled={currentChapter >= totalChapters}
+            className={`flex-1 py-3 rounded-lg ml-2 ${currentChapter >= totalChapters ? 'opacity-50 bg-surface border border-border' : 'bg-primary'}`}
           >
-            <Text className="text-sm font-semibold text-white text-center">
-              Siguiente →
+            <Text className={`text-sm font-semibold text-center ${currentChapter >= totalChapters ? 'text-foreground' : 'text-white'}`}>
+              Siguiente
             </Text>
           </TouchableOpacity>
         </View>
