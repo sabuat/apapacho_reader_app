@@ -1,18 +1,10 @@
-import { ScrollView, Text, View, TouchableOpacity, FlatList, ActivityIndicator } from "react-native";
-import { Image } from "expo-image";
-import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { ScrollView, Text, View, TouchableOpacity, FlatList, ActivityIndicator } from 'react-native';
+import { Image } from 'expo-image';
+import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 
-import { ScreenContainer } from "@/components/screen-container";
-import { supabase } from "@/lib/supabase";
-
-interface Book {
-  id: number;
-  title: string;
-  author: string;
-  cover_url?: string;
-  published: boolean;
-}
+import { ScreenContainer } from '@/components/screen-container';
+import { type Book, getPublishedBooks } from '@/lib/api';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -20,25 +12,20 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const fetchBooks = async () => {
+      try {
+        const data = await getPublishedBooks();
+        setBooks(data);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Erro desconhecido';
+        console.error('Error cargando libros:', message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchBooks();
   }, []);
-
-  const fetchBooks = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('books')
-        .select('*')
-        .eq('published', true)
-        .order('id', { ascending: false });
-        
-      if (error) throw error;
-      if (data) setBooks(data);
-    } catch (error) {
-      console.error("Error cargando base de datos:", error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleBookPress = (bookId: number) => {
     router.push(`/reader/${bookId}`);
@@ -64,9 +51,7 @@ export default function HomeScreen() {
               </View>
             ) : books.length === 0 ? (
               <View className="bg-surface rounded-lg p-6 items-center justify-center border border-border">
-                <Text className="text-sm text-muted text-center">
-                  No hay libros disponibles en este momento
-                </Text>
+                <Text className="text-sm text-muted text-center">No hay libros disponibles en este momento</Text>
               </View>
             ) : (
               <FlatList
@@ -81,8 +66,8 @@ export default function HomeScreen() {
                     className="flex-1 bg-surface rounded-lg overflow-hidden border border-border"
                   >
                     <Image
-                      source={item.cover_url ? { uri: item.cover_url } : require("@/assets/images/icon.png")}
-                      style={{ width: "100%", height: 180 }}
+                      source={item.cover_url ? { uri: item.cover_url } : require('@/assets/images/icon.png')}
+                      style={{ width: '100%', height: 180 }}
                       contentFit="cover"
                       transition={200}
                     />
