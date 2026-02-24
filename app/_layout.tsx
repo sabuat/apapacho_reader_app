@@ -20,6 +20,7 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
+      {!session ? <Redirect href="/auth" /> : null}
       <Stack screenOptions={{ headerShown: false }}>
         {session ? (
           <>
