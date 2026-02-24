@@ -1,188 +1,118 @@
-import { useState, useEffect } from 'react';
-import { ScrollView, Text, View, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
-import { ScreenContainer } from '@/components/screen-container';
-import { type Book, type Chapter, getBookById, getChapterByNumber, getChapterCount } from '@/lib/api';
+import { getBookById, getChapterByNumber, getChapterCount, type Book, type Chapter } from '@/lib/api';
 
 export default function ReaderScreen() {
   const router = useRouter();
-  const { id, chapter: chapterParam } = useLocalSearchParams();
-
+  const { id } = useLocalSearchParams();
   const bookId = Number(id);
-  const [fontSize, setFontSize] = useState(16);
-  const [currentChapter, setCurrentChapter] = useState(Number(chapterParam ?? 1) || 1);
-  const [showAd, setShowAd] = useState(false);
 
   const [book, setBook] = useState<Book | null>(null);
   const [chapter, setChapter] = useState<Chapter | null>(null);
+  const [chapterNumber, setChapterNumber] = useState(1);
   const [totalChapters, setTotalChapters] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [showAd, setShowAd] = useState(false);
 
   useEffect(() => {
     if (!bookId) return;
-
-    const fetchBookInfo = async () => {
-      try {
-        const [bookData, chapterCount] = await Promise.all([getBookById(bookId), getChapterCount(bookId)]);
-        setBook(bookData);
-        setTotalChapters(chapterCount);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Erro desconhecido';
-        console.error('Error cargando libro:', message);
-      }
-    };
-
-    fetchBookInfo();
+    Promise.all([getBookById(bookId), getChapterCount(bookId)]).then(([b, count]) => {
+      setBook(b);
+      setTotalChapters(count);
+    });
   }, [bookId]);
 
   useEffect(() => {
     if (!bookId) return;
+    setLoading(true);
+    getChapterByNumber(bookId, chapterNumber)
+      .then(setChapter)
+      .finally(() => setLoading(false));
+  }, [bookId, chapterNumber]);
 
-    const fetchChapterContent = async () => {
-      setLoading(true);
-      try {
-        const chapterData = await getChapterByNumber(bookId, currentChapter);
-        setChapter(chapterData);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Erro desconhecido';
-        console.error('Error cargando capítulo:', message);
-        setChapter(null);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const progress = useMemo(() => {
+    if (!totalChapters) return 0;
+    return Math.round((chapterNumber / totalChapters) * 100);
+  }, [chapterNumber, totalChapters]);
 
-    fetchChapterContent();
-  }, [bookId, currentChapter]);
-
-  const handleNextChapter = () => {
-    if (currentChapter < totalChapters) {
-      setShowAd(true);
-      setTimeout(() => {
-        setShowAd(false);
-        setCurrentChapter((prev) => prev + 1);
-      }, 3000);
-    }
-  };
-
-  const handlePreviousChapter = () => {
-    if (currentChapter > 1) {
-      setCurrentChapter((prev) => prev - 1);
-    }
-  };
-
-  if (loading && !chapter) {
+  if (loading) {
     return (
-      <ScreenContainer className="items-center justify-center bg-background">
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator size="large" color="#C5A059" />
-        <Text className="text-foreground mt-4">Abriendo libro...</Text>
-      </ScreenContainer>
+      </View>
     );
   }
 
   if (!book || !chapter) {
     return (
-      <ScreenContainer className="items-center justify-center bg-background">
-        <Text className="text-foreground">Este capítulo aún no está disponible.</Text>
-        <TouchableOpacity onPress={() => router.back()} className="mt-4 px-4 py-2 bg-primary rounded-lg">
-          <Text className="text-white font-semibold">Volver a la biblioteca</Text>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+        <Text>Capítulo não disponível.</Text>
+        <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 12 }}>
+          <Text style={{ color: '#C5A059', fontWeight: '700' }}>Volver</Text>
         </TouchableOpacity>
-      </ScreenContainer>
+      </View>
     );
   }
 
-  const progress = totalChapters > 0 ? (currentChapter / totalChapters) * 100 : 0;
+  const nextChapter = () => {
+    if (chapterNumber >= totalChapters) return;
+    setShowAd(true);
+    setTimeout(() => {
+      setShowAd(false);
+      setChapterNumber((v) => v + 1);
+    }, 2000);
+  };
 
   return (
-    <ScreenContainer className="bg-background">
-      <View className="px-4 py-3 border-b border-border flex-row justify-between items-center">
-        <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2">
-          <Text className="text-primary text-2xl leading-none">←</Text>
+    <View style={{ flex: 1, backgroundColor: '#fff' }}>
+      <View style={{ padding: 12, borderBottomWidth: 1, borderBottomColor: '#eee', flexDirection: 'row', alignItems: 'center' }}>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Text style={{ fontSize: 22, color: '#C5A059' }}>←</Text>
         </TouchableOpacity>
-        <View className="flex-1 mx-4">
-          <Text className="text-sm font-semibold text-foreground text-center" numberOfLines={1}>
-            {book.title}
-          </Text>
-          <Text className="text-xs text-muted text-center">Capítulo {currentChapter} de {totalChapters}</Text>
+        <View style={{ flex: 1, marginLeft: 10 }}>
+          <Text style={{ fontWeight: '700' }} numberOfLines={1}>{book.title}</Text>
+          <Text style={{ color: '#687076' }}>Capítulo {chapterNumber} de {totalChapters}</Text>
         </View>
-        <View className="w-8" />
       </View>
 
-      {showAd && (
-        <View className="absolute z-50 inset-0 bg-background items-center justify-center px-6">
-          <Text className="text-sm font-bold text-primary mb-4 tracking-widest">PUBLICIDAD</Text>
-          <View className="w-full h-64 bg-surface rounded-xl border border-border items-center justify-center mb-8 shadow-sm">
-            <Text className="text-muted text-center px-4">Espacio reservado para tu red de anuncios (AdMob / Meta)</Text>
+      {showAd ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <Text style={{ color: '#C5A059', fontWeight: '700' }}>PUBLICIDAD</Text>
+          <View style={{ height: 160, width: '100%', backgroundColor: '#f2f2f2', borderRadius: 12, marginTop: 12, alignItems: 'center', justifyContent: 'center' }}>
+            <Text>Espacio para anuncio</Text>
           </View>
-          <ActivityIndicator size="small" color="#C5A059" className="mb-4" />
-          <Text className="text-sm text-foreground text-center font-semibold">Tu capítulo cargará en breve...</Text>
         </View>
+      ) : (
+        <>
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16 }}>
+            <Text style={{ color: '#C5A059', fontWeight: '700' }}>Capítulo {chapter.chapter_number}</Text>
+            <Text style={{ fontSize: 26, fontWeight: '700', marginTop: 4 }}>{chapter.title}</Text>
+            <Text style={{ marginTop: 16, fontSize: 16, lineHeight: 26, color: '#2D2D20' }}>{chapter.content}</Text>
+          </ScrollView>
+
+          <View style={{ padding: 12, borderTopWidth: 1, borderTopColor: '#eee' }}>
+            <Text style={{ textAlign: 'center', marginBottom: 10 }}>{progress}% completado</Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TouchableOpacity
+                style={{ flex: 1, padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#ddd', opacity: chapterNumber === 1 ? 0.4 : 1 }}
+                disabled={chapterNumber === 1}
+                onPress={() => setChapterNumber((v) => Math.max(1, v - 1))}
+              >
+                <Text style={{ textAlign: 'center' }}>Anterior</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ flex: 1, padding: 12, borderRadius: 8, backgroundColor: '#C5A059', opacity: chapterNumber >= totalChapters ? 0.4 : 1 }}
+                disabled={chapterNumber >= totalChapters}
+                onPress={nextChapter}
+              >
+                <Text style={{ textAlign: 'center', color: '#fff', fontWeight: '700' }}>Siguiente</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </>
       )}
-
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
-        <View className="px-6 py-8 gap-6">
-          <View className="gap-2 mb-2">
-            <Text className="text-xs text-primary font-bold uppercase tracking-wider">Capítulo {chapter.chapter_number}</Text>
-            <Text className="text-3xl font-bold font-serif text-foreground leading-tight">{chapter.title}</Text>
-          </View>
-
-          <Text style={{ fontSize, lineHeight: fontSize * 1.6 }} className="text-foreground text-justify">
-            {chapter.content}
-          </Text>
-
-          <View className="bg-surface rounded-xl p-5 mt-8 border border-border items-center shadow-sm">
-            <Text className="text-[10px] font-bold text-muted uppercase tracking-wider mb-3">Patrocinado</Text>
-            <Text className="text-base font-serif text-foreground text-center mb-4">
-              ¿Te está gustando la lectura? Apoya a Apapacho compartiendo la app.
-            </Text>
-            <TouchableOpacity className="bg-primary rounded-lg px-6 py-2.5 w-full">
-              <Text className="text-white text-sm font-semibold text-center">Descubrir más libros</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </ScrollView>
-
-      <View className="border-t border-border px-5 py-5 gap-4 bg-background">
-        <View className="gap-2">
-          <View className="h-1.5 bg-surface rounded-full overflow-hidden border border-border/50">
-            <View className="h-full bg-primary rounded-full" style={{ width: `${progress}%` }} />
-          </View>
-          <Text className="text-[10px] text-muted text-center font-semibold uppercase tracking-wider">
-            {Math.round(progress)}% completado
-          </Text>
-        </View>
-
-        <View className="flex-row justify-between items-center mt-2">
-          <TouchableOpacity
-            onPress={handlePreviousChapter}
-            disabled={currentChapter === 1}
-            className={`flex-1 py-3 border border-border rounded-lg mr-2 ${currentChapter === 1 ? 'opacity-40 bg-surface' : 'bg-background'}`}
-          >
-            <Text className="text-sm font-semibold text-foreground text-center">Anterior</Text>
-          </TouchableOpacity>
-
-          <View className="flex-row bg-surface rounded-lg p-1 mx-2 border border-border">
-            <TouchableOpacity onPress={() => setFontSize(Math.max(14, fontSize - 2))} className="px-4 py-2">
-              <Text className="text-foreground font-semibold text-sm">A-</Text>
-            </TouchableOpacity>
-            <View className="w-px bg-border my-2" />
-            <TouchableOpacity onPress={() => setFontSize(Math.min(28, fontSize + 2))} className="px-4 py-2">
-              <Text className="text-foreground font-semibold text-base">A+</Text>
-            </TouchableOpacity>
-          </View>
-
-          <TouchableOpacity
-            onPress={handleNextChapter}
-            disabled={currentChapter >= totalChapters}
-            className={`flex-1 py-3 rounded-lg ml-2 ${currentChapter >= totalChapters ? 'opacity-50 bg-surface border border-border' : 'bg-primary'}`}
-          >
-            <Text className={`text-sm font-semibold text-center ${currentChapter >= totalChapters ? 'text-foreground' : 'text-white'}`}>
-              Siguiente
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </ScreenContainer>
+    </View>
   );
 }

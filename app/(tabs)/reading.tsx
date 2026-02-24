@@ -1,81 +1,42 @@
-import { ScrollView, Text, View, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList, Text, TouchableOpacity, View } from 'react-native';
+import { useRouter } from 'expo-router';
 
-import { ScreenContainer } from '@/components/screen-container';
-import { type Book, getPublishedBooks } from '@/lib/api';
+import { getPublishedBooks, type Book } from '@/lib/api';
 
 export default function ReadingScreen() {
   const router = useRouter();
-  const [booksInProgress, setBooksInProgress] = useState<Book[]>([]);
+  const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchBooks = async () => {
-      try {
-        const data = await getPublishedBooks();
-        setBooksInProgress(data);
-      } catch (error) {
-        console.error(error instanceof Error ? error.message : 'Erro desconhecido');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchBooks();
+    getPublishedBooks()
+      .then(setBooks)
+      .finally(() => setLoading(false));
   }, []);
 
-  return (
-    <ScreenContainer className="bg-background">
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
-        <View className="gap-6 pb-6">
-          <View className="px-6 pt-4 gap-2 border-b border-border pb-4">
-            <Text className="text-3xl font-bold font-serif text-foreground">Mi Lectura</Text>
-            <Text className="text-sm text-muted">Continúa tu aventura literaria</Text>
-          </View>
+  if (loading) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator size="large" color="#C5A059" />
+      </View>
+    );
+  }
 
-          {loading ? (
-            <View className="items-center justify-center py-8">
-              <ActivityIndicator size="large" color="#C5A059" />
-            </View>
-          ) : booksInProgress.length === 0 ? (
-            <View className="px-6">
-              <View className="bg-surface rounded-lg p-6 items-center justify-center border border-border">
-                <Text className="text-sm text-muted text-center mb-4">Aún no hay libros disponibles</Text>
-              </View>
-            </View>
-          ) : (
-            <View className="px-6 gap-4">
-              {booksInProgress.map((book) => (
-                <TouchableOpacity
-                  key={book.id}
-                  onPress={() => router.push(`/reader/${book.id}`)}
-                  className="bg-surface rounded-lg overflow-hidden border border-border active:opacity-80"
-                >
-                  <View className="flex-row gap-4 p-4">
-                    <Image
-                      source={book.cover_url ? { uri: book.cover_url } : require('@/assets/images/icon.png')}
-                      style={{ width: 80, height: 120 }}
-                      contentFit="cover"
-                      className="rounded"
-                    />
-                    <View className="flex-1 justify-center">
-                      <View className="gap-1 mb-2">
-                        <Text className="text-sm font-semibold text-foreground">{book.title}</Text>
-                        <Text className="text-xs text-muted">{book.author}</Text>
-                      </View>
-                      <View className="bg-background rounded-full h-1.5 overflow-hidden mt-4">
-                        <View className="h-full bg-primary w-1/3" />
-                      </View>
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-        </View>
-      </ScrollView>
-    </ScreenContainer>
+  return (
+    <View style={{ flex: 1, backgroundColor: '#fff', padding: 16 }}>
+      <Text style={{ fontSize: 28, fontWeight: '700', color: '#2D2D20', marginBottom: 12 }}>Mi Lectura</Text>
+      <FlatList
+        data={books}
+        keyExtractor={(item) => String(item.id)}
+        renderItem={({ item }) => (
+          <TouchableOpacity onPress={() => router.push(`/reader/${item.id}`)} style={{ paddingVertical: 12 }}>
+            <Text style={{ fontWeight: '700' }}>{item.title}</Text>
+            <Text style={{ color: '#687076' }}>{item.author}</Text>
+          </TouchableOpacity>
+        )}
+        ListEmptyComponent={<Text>Sem leitura em progresso.</Text>}
+      />
+    </View>
   );
 }
