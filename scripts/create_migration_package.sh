@@ -3,9 +3,10 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT_DIR="$ROOT_DIR/migration-package"
-ARCHIVE="$ROOT_DIR/apapacho-reader-migration.tar.gz"
+ZIP_FILE="$ROOT_DIR/apapacho-reader-migration.zip"
+TAR_FILE="$ROOT_DIR/apapacho-reader-migration.tar.gz"
 
-rm -rf "$OUT_DIR" "$ARCHIVE"
+rm -rf "$OUT_DIR" "$ZIP_FILE" "$TAR_FILE"
 mkdir -p "$OUT_DIR"
 
 copy_item() {
@@ -24,6 +25,7 @@ copy_item "hooks"
 copy_item "constants"
 copy_item "docs"
 copy_item "react-native-css-interop"
+copy_item "scripts"
 
 # Core config files
 for file in \
@@ -44,20 +46,26 @@ for file in \
   done
 
 cat > "$OUT_DIR/README-MIGRATION.txt" <<'TXT'
-Apapacho Reader - Migration Package
+Apapacho Reader - Migration ZIP
 
-1) In your new repo root, copy all files from this folder.
-2) Run: pnpm install
-3) Create .env with:
+1) Copie tudo desta pasta para o repo novo
+2) Rode: pnpm install
+3) Crie .env com:
    EXPO_PUBLIC_SUPABASE_URL=...
    EXPO_PUBLIC_SUPABASE_ANON_KEY=...
-   EXPO_PUBLIC_BACKEND_API_URL=... (optional)
-4) Run SQL from docs/SUPABASE_SETUP.md
-5) Start app: npx expo start --clear
+4) Rode SQL em docs/SUPABASE_SETUP.md
+5) Rode: npx expo start --clear
 TXT
 
-# Create compressed archive too
-tar -czf "$ARCHIVE" -C "$ROOT_DIR" "$(basename "$OUT_DIR")"
+if command -v zip >/dev/null 2>&1; then
+  (
+    cd "$ROOT_DIR"
+    zip -rq "$(basename "$ZIP_FILE")" "$(basename "$OUT_DIR")"
+  )
+  echo "✅ ZIP: $ZIP_FILE"
+else
+  tar -czf "$TAR_FILE" -C "$ROOT_DIR" "$(basename "$OUT_DIR")"
+  echo "⚠️ zip não encontrado; gerado TAR.GZ: $TAR_FILE"
+fi
 
-echo "✅ Migration folder: $OUT_DIR"
-echo "✅ Archive: $ARCHIVE"
+echo "✅ Pasta: $OUT_DIR"
