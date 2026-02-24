@@ -1,34 +1,30 @@
-import { ScrollView, Text, View, TouchableOpacity, ActivityIndicator } from "react-native";
-import { Image } from "expo-image";
-import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { ScrollView, Text, View, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { Image } from 'expo-image';
+import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 
-import { ScreenContainer } from "@/components/screen-container";
-import { supabase } from "@/lib/supabase";
+import { ScreenContainer } from '@/components/screen-container';
+import { type Book, getPublishedBooks } from '@/lib/api';
 
 export default function ReadingScreen() {
   const router = useRouter();
-  const [booksInProgress, setBooksInProgress] = useState([]);
+  const [booksInProgress, setBooksInProgress] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchBooks = async () => {
       try {
-        const { data, error } = await supabase.from('books').select('*').eq('published', true);
-        if (error) throw error;
-        if (data) setBooksInProgress(data);
+        const data = await getPublishedBooks();
+        setBooksInProgress(data);
       } catch (error) {
-        console.error(error);
+        console.error(error instanceof Error ? error.message : 'Erro desconhecido');
       } finally {
         setLoading(false);
       }
     };
+
     fetchBooks();
   }, []);
-
-  const handleBookPress = (bookId: number) => {
-    router.push(`/reader/${bookId}`);
-  };
 
   return (
     <ScreenContainer className="bg-background">
@@ -54,12 +50,12 @@ export default function ReadingScreen() {
               {booksInProgress.map((book) => (
                 <TouchableOpacity
                   key={book.id}
-                  onPress={() => handleBookPress(book.id)}
+                  onPress={() => router.push(`/reader/${book.id}`)}
                   className="bg-surface rounded-lg overflow-hidden border border-border active:opacity-80"
                 >
                   <View className="flex-row gap-4 p-4">
                     <Image
-                      source={book.cover_url ? { uri: book.cover_url } : require("@/assets/images/icon.png")}
+                      source={book.cover_url ? { uri: book.cover_url } : require('@/assets/images/icon.png')}
                       style={{ width: 80, height: 120 }}
                       contentFit="cover"
                       className="rounded"
