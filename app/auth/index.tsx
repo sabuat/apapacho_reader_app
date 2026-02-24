@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Redirect, useRouter } from 'expo-router';
 import { Redirect } from 'expo-router';
 
 import { ScreenContainer } from '@/components/screen-container';
@@ -7,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuthSession } from '@/lib/use-auth-session';
 
 export default function AuthScreen() {
+  const router = useRouter();
   const { session, loading } = useAuthSession();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -27,6 +29,13 @@ export default function AuthScreen() {
   }
 
   const handleAuth = async () => {
+    if (!email || !password) {
+      setMessage('Preencha email e senha.');
+      return;
+    }
+
+
+  const handleAuth = async () => {
     setBusy(true);
     setMessage(null);
 
@@ -34,6 +43,11 @@ export default function AuthScreen() {
       if (isRegisterMode) {
         const { error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
+        setMessage('Conta criada. Verifique seu email para confirmar o acesso.');
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        router.replace('/(tabs)');
         setMessage('Conta criada! Verifique seu email para confirmar o acesso.');
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -73,16 +87,39 @@ export default function AuthScreen() {
           />
         </View>
 
+
+        <View className="gap-3 mt-2">
+          <TextInput
+            value={email}
+            onChangeText={setEmail}
+            placeholder="Email"
+            autoCapitalize="none"
+            keyboardType="email-address"
+            className="bg-background border border-border rounded-lg px-4 py-3 text-foreground"
+            placeholderTextColor="#8C97AE"
+          />
+          <TextInput
+            value={password}
+            onChangeText={setPassword}
+            placeholder="Senha"
+            secureTextEntry
+            className="bg-background border border-border rounded-lg px-4 py-3 text-foreground"
+            placeholderTextColor="#8C97AE"
+          />
+        </View>
+
         <TouchableOpacity onPress={handleAuth} disabled={busy} className="bg-primary rounded-lg py-3">
           {busy ? (
             <ActivityIndicator color="#fff" />
           ) : (
+            <Text className="text-white text-center font-semibold">{isRegisterMode ? 'Crear cuenta' : 'Acceder'}</Text>
             <Text className="text-white text-center font-semibold">{isRegisterMode ? 'Criar conta' : 'Entrar'}</Text>
           )}
         </TouchableOpacity>
 
         <TouchableOpacity onPress={() => setIsRegisterMode((prev) => !prev)}>
           <Text className="text-center text-primary font-semibold">
+            {isRegisterMode ? 'Ya tengo cuenta' : 'No tengo cuenta todavía'}
             {isRegisterMode ? 'Já tenho conta' : 'Não tenho conta ainda'}
           </Text>
         </TouchableOpacity>

@@ -1,5 +1,6 @@
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import { Stack } from 'expo-router';
 import { Redirect, Stack } from 'expo-router';
 import '@/global.css';
 
@@ -16,6 +17,14 @@ export default function RootLayout() {
     <SafeAreaProvider>
       {!session ? <Redirect href="/auth" /> : null}
       <Stack screenOptions={{ headerShown: false }}>
+        {session ? (
+          <>
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="reader/[id]" options={{ presentation: 'fullScreenModal' }} />
+          </>
+        ) : (
+          <Stack.Screen name="auth/index" />
+        )}
         <Stack.Screen name="auth/index" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="reader/[id]" options={{ presentation: 'fullScreenModal' }} />
