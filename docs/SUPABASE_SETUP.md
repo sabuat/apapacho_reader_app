@@ -46,10 +46,6 @@ No Supabase Auth, a tabela principal de autenticação **já existe**:
 
 ## 4) Tabela pública vinculada ao usuário (recomendado)
 Crie uma tabela de perfil ligada ao `auth.users.id`:
-## 3) Login de usuário
-O login usa `supabase.auth` (email/senha), então a tabela de autenticação base já é criada automaticamente pelo Supabase.
-
-Se quiser perfil público do usuário, crie:
 
 ```sql
 create table if not exists public.profiles (
@@ -60,9 +56,6 @@ create table if not exists public.profiles (
   role text default 'reader',
   created_at timestamptz default now(),
   updated_at timestamptz default now()
-  display_name text,
-  avatar_url text,
-  created_at timestamptz default now()
 );
 
 alter table public.profiles enable row level security;
